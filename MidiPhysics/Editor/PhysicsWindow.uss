@@ -1,0 +1,144 @@
+.ControlName {
+    color: rgb(0, 0, 0);
+    width: 15%;
+    -unity-text-align: upper-center;
+}
+
+.Row {
+    flex-grow: 1;
+    flex-direction: row;
+    justify-content: flex-start;
+}
+
+.GridCell {
+    flex-direction: column;
+    background-color: rgba(0, 0, 0, 0.72);
+    margin-top: 10px;
+    margin-right: 10px;
+    margin-bottom: 10px;
+    margin-left: 10px;
+    align-items: center;
+    justify-content: center;
+    align-self: center;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    border-bottom-right-radius: 5px;
+    border-bottom-left-radius: 5px;
+    border-top-width: 5px;
+    border-right-width: 5px;
+    border-bottom-width: 5px;
+    border-left-width: 5px;
+}
+
+.GridRow {
+    flex-grow: 1;
+    flex-direction: row;
+    height: 50%;
+}
+
+.VarField {
+    justify-content: center;
+    width: 85%;
+    margin-top: 0;
+    margin-right: 0;
+    margin-bottom: 0;
+    margin-left: 0;
+    -unity-background-image-tint-color: rgba(255, 255, 255, 0);
+    background-color: rgba(0, 0, 0, 0);
+    flex-direction: column;
+    align-items: center;
+    align-self: center;
+    -unity-text-align: upper-center;
+    border-top-width: 1px;
+    border-top-color: rgba(0, 0, 0, 0.43);
+    padding-bottom: 6px;
+    flex-wrap: wrap;
+    border-bottom-width: 1px;
+}
+
+.ModifiedCell {
+    border-top-width: 5px;
+    border-right-width: 5px;
+    border-bottom-width: 5px;
+    border-left-width: 5px;
+    border-left-color: rgb(255, 0, 100);
+    border-right-color: rgb(255, 0, 100);
+    border-top-color: rgb(255, 0, 100);
+    border-bottom-color: rgb(255, 0, 100);
+}
+
+.ActiveCell {
+    background-color: rgba(0, 255, 207, 0.66);
+}
+
+.LockedCell {
+    background-image: url('project://database/Assets/Art/UI/lock.png?fileID=2800000&guid=d3b128dae4446ca40ac757e4fba75637&type=3#lock');
+    -unity-background-image-tint-color: rgba(255, 255, 255, 0.28);
+    background-color: rgba(142, 142, 142, 0.54);
+}
+
+.unity-float-field_Label {
+    white-space: normal;
+    color: rgb(255, 255, 255);
+}
+
+.MinField {
+    justify-content: flex-start;
+    width: 30%;
+    margin-top: 0;
+    margin-right: 0;
+    margin-bottom: 0;
+    margin-left: 0;
+    -unity-background-image-tint-color: rgba(255, 255, 255, 0);
+    background-color: rgba(0, 0, 0, 0);
+    flex-wrap: wrap;
+    white-space: normal;
+    flex-direction: column;
+}
+
+.MaxField {
+    justify-content: flex-start;
+    width: 30%;
+    margin-top: 0;
+    margin-right: 0;
+    margin-bottom: 0;
+    margin-left: 0;
+    -unity-background-image-tint-color: rgba(255, 255, 255, 0);
+    background-color: rgba(0, 0, 0, 0);
+    flex-wrap: wrap;
+    white-space: normal;
+    flex-direction: column;
+}
+
+.VarField {
+    justify-content: space-between;
+    width: 85%;
+    margin-top: 0;
+    margin-right: 0;
+    margin-bottom: 0;
+    margin-left: 0;
+    -unity-background-image-tint-color: rgba(255, 255, 255, 0);
+    background-color: rgba(0, 0, 0, 0);
+    flex-wrap: wrap;
+    white-space: normal;
+    border-bottom-color: rgba(0, 0, 0, 0.43);
+    border-left-color: rgba(0, 0, 0, 0.43);
+    border-right-color: rgba(0, 0, 0, 0.43);
+    border-top-color: rgba(0, 0, 0, 0.43);
+    padding-bottom: 15px;
+}
+
+.MinMaxContainer {
+    flex-grow: 1;
+    flex-direction: row;
+    justify-content: space-around;
+    border-top-width: 1px;
+    padding-bottom: 10px;
+    height: 60px;
+    max-height: 80px;
+    width: 85%;
+}
+
+.ControlName {
+    color: rgb(255, 255, 255);
+}
