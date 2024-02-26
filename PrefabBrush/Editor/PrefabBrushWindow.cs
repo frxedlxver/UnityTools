@@ -1,17 +1,23 @@
 using MyUtilities.ClassExtensions;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Serialization.Json;
 using UnityEditor;
+using UnityEditor.Graphs;
+using UnityEditor.Rendering;
 using UnityEngine;
+using UnityEngine.Rendering;
 
-namespace MyUtilities.PrefabPainter
+namespace MyUtilities.PrefabBrush
 {
-    public class PrefabBrushTool : EditorWindow
+    public class PrefabBrushWindow : EditorWindow
     {
+        private static bool windowOpen;
+        private static bool windowActive;
         private PrefabPalette activePalette;
-        private PrefabPainterSettings settings;
-        private GhostPrefabManager ghostPrefabManager = new();
-        private int selectedPrefabIndex = -1;
+        private Settings settings;
+        private GhostPrefabManager ghostManager = new();
+        private int selectedPrefabIndex;
         private float prefabZDelta = 1f;
         private float rotationDelta = 1f;
         private bool hidePrefabInHierarchy = true;
@@ -24,7 +30,7 @@ namespace MyUtilities.PrefabPainter
         {
             get
             {
-                if (activePalette == null || activePalette.prefabs == null || activePalette.prefabs.Length == 0)
+                if (activePalette == null || activePalette.prefabs == null || activePalette.prefabs.Length == 0 || selectedPrefabIndex == -1)
                     return null;
                 else return activePalette.prefabs.ElementAt(selectedPrefabIndex);
             }
@@ -40,48 +46,109 @@ namespace MyUtilities.PrefabPainter
                 if (value != selectedPrefabIndex)
                 {
                     selectedPrefabIndex = value;
-                    ghostPrefabManager.CreateGhostPrefab(SelectedPrefab, hidePrefabInHierarchy); // Refresh ghost prefab for the new selection
-                    ghostPrefabManager.ShowGhostPrefab(true);
+                    ghostManager.CreateGhostPrefab(SelectedPrefab, hidePrefabInHierarchy); // Refresh ghost prefab for the new selection
                 }
             }
         }
 
+        public PrefabBrushWindow()
+        {
+
+        }
+
+        private static PrefabBrushWindow GetWindow()
+        {
+            return GetWindow<PrefabBrushWindow>("Prefab Brush Window");
+        }
 
 
-        [MenuItem("Tools/Prefab Brush Tool")]
+        [MenuItem("Tools/Prefab Brush Window")]
         public static void ShowWindow()
         {
-            GetWindow<PrefabBrushTool>("Prefab Brush");
+            GetWindow().Show();
+
+        }
+
+        public static void CloseWindow()
+        {
+            GetWindow().Close();
+        }
+
+        public static void ToggleActive()
+        {
+            SetActive(!windowActive);
+        }
+
+        public static void SetActive(bool active)
+        {
+            if (!windowOpen)
+            {
+                ShowWindow();
+            }
+
+            windowActive = active;
+
+            if (windowActive)
+            {
+                GetWindow().OnBecameActive();
+            } else
+            {
+                GetWindow().OnBecameInactive();
+            }
         }
 
         private void OnBecameInvisible()
         {
-            SceneView.duringSceneGui -= OnSceneGUI;
-            ghostPrefabManager.DestroyGhost();
+            OnBecameInactive();
         }
 
         private void OnBecameVisible()
         {
-            SceneView.duringSceneGui += OnSceneGUI;
-            ghostPrefabManager.DestroyGhost();
+            OnBecameActive();
         }
 
-        void OnEnable()
-        {  
-            LoadSettings();
-            if (SelectedPrefab != null)
+        private void OnBecameActive()
+        {
+            if (settings == null) LoadSettings();
+            // remove, in case it has already been added
+            SceneView.duringSceneGui -= OnSceneGUI;
+            SceneView.duringSceneGui += OnSceneGUI;
+            if (SelectedPrefab != null && ghostManager != null)
             {
-                ghostPrefabManager.CreateGhostPrefab(SelectedPrefab, hidePrefabInHierarchy);
-                ghostPrefabManager.prefabScale = 1f;
-                ghostPrefabManager.prefabZPos = 0f;
-                ghostPrefabManager.prefabZRotation = 0f;
+                ghostManager.CreateGhostPrefab(SelectedPrefab, hidePrefabInHierarchy);
+                ghostManager.prefabScale = 1f;
+                ghostManager.prefabZPos = 0f;
+                ghostManager.prefabZRotation = 0f;
+            }
+
+            SceneView.RepaintAll();
+            SceneView.currentDrawingSceneView?.Focus();
+        }
+
+        private void OnBecameInactive()
+        {
+            SceneView.duringSceneGui -= OnSceneGUI;
+            ghostManager.DestroyGhost();
+            SceneView.currentDrawingSceneView?.Repaint();
+            SceneView.currentDrawingSceneView?.Focus();
+        }
+        void OnEnable()
+        {
+
+            windowOpen = true;
+            windowActive = true;
+            OnBecameActive();
+            if (settings.Palettes != null && settings.Palettes.Length > 0)
+            {
+                activePalette = settings.Palettes[settings.selectedPalette];
             }
         }
 
         void OnDisable()
         {
-            SceneView.duringSceneGui -= OnSceneGUI;
-            ghostPrefabManager.DestroyGhost();
+            windowOpen = false;
+            windowActive = false;
+            OnBecameInactive();
         }
 
         void OnGUI()
@@ -105,7 +172,7 @@ namespace MyUtilities.PrefabPainter
             {
                 TargetParent = null;
             }
-            ghostPrefabManager.SetParent(TargetParent);
+            ghostManager.SetParent(TargetParent);
 
 
             if (activePalette != null)
@@ -125,7 +192,7 @@ namespace MyUtilities.PrefabPainter
 
             Event e = Event.current;
 
-            HandleMouseMovement(sceneView, e);
+            ghostManager.HandleMouseMovement(sceneView, e);
 
             switch (e.type)
             {
@@ -171,21 +238,23 @@ namespace MyUtilities.PrefabPainter
             {
                 Handles.BeginGUI();
 
-                float height = 225;
-                float width = 150;
-                float margin = 2;
-                GUILayout.Window(0, new Rect(margin, sceneView.cameraViewport.size.y - (height + margin), width, height), (id) =>
+                int height = 225;
+                int width = 150;
+                int margin = 2;
+
+
+                var window = GUILayout.Window(0, new Rect(margin, sceneView.cameraViewport.size.y - (height + margin), width, height), (id) =>
                 {
                     GUILayout.Label("Scale", EditorStyles.boldLabel);
-                    ghostPrefabManager.prefabScale = EditorGUILayout.FloatField("Scale", ghostPrefabManager.prefabScale);
+                    ghostManager.prefabScale = EditorGUILayout.FloatField("Scale", ghostManager.prefabScale);
                     GUILayout.Space(30);
                     GUILayout.Label("Z Position", EditorStyles.boldLabel);
-                    ghostPrefabManager.prefabZPos = EditorGUILayout.FloatField("Z Position", ghostPrefabManager.prefabZPos);
+                    ghostManager.prefabZPos = EditorGUILayout.FloatField("Z Position", ghostManager.prefabZPos);
                     prefabZDelta = EditorGUILayout.FloatField("Z position change on scroll", prefabZDelta);
 
                     GUILayout.Space(20);
                     GUILayout.Label("Z Rotation", EditorStyles.boldLabel);
-                    ghostPrefabManager.prefabZRotation = EditorGUILayout.FloatField("Z Rotation", ghostPrefabManager.prefabZRotation);
+                    ghostManager.prefabZRotation = EditorGUILayout.FloatField("Z Rotation", ghostManager.prefabZRotation);
                     rotationDelta = EditorGUILayout.FloatField("Z Rotation change on scroll", rotationDelta);
                 }, "Prefab Brush");
                 Handles.EndGUI();
@@ -194,7 +263,7 @@ namespace MyUtilities.PrefabPainter
 
         private void HandleLMB(Event e)
         {
-            if (selectedPrefabIndex < 0 || selectedPrefabIndex >= activePalette.prefabs.Length || ghostPrefabManager.ghostPrefab == null)
+            if (selectedPrefabIndex < 0 || selectedPrefabIndex >= activePalette.prefabs.Length || ghostManager.ghostPrefab == null)
             {
                 Debug.LogWarning("Prefab Brush Tool: No prefab selected or index out of range.");
                 return;
@@ -205,33 +274,9 @@ namespace MyUtilities.PrefabPainter
             {
                 instantiatedPrefab.transform.parent = TargetParent.transform;
             }
-            instantiatedPrefab.transform.CopyValuesFrom(ghostPrefabManager.ghostPrefab.transform); // copy transform
+            instantiatedPrefab.transform.CopyValuesFrom(ghostManager.ghostPrefab.transform); // copy transform
             Undo.RegisterCreatedObjectUndo(instantiatedPrefab, "Instantiate Prefab");
             e.Use();
-
-        }
-
-        private void HandleMouseMovement(SceneView sceneView, Event e)
-        {
-            // Determine if the mouse is within the Scene view
-            bool isMouseInSceneView = sceneView.cameraViewport.Contains(e.mousePosition);
-
-            if (isMouseInSceneView)
-            {
-                ghostPrefabManager.ShowGhostPrefab(true);
-                if (e.type == EventType.MouseMove || e.type == EventType.MouseDrag)
-                {
-
-                    Vector3 mouseWindowPos = new(e.mousePosition.x, sceneView.camera.pixelHeight - e.mousePosition.y);
-                    Vector3 mouseWorldPos = sceneView.camera.ScreenToWorldPoint(mouseWindowPos);
-
-                    ghostPrefabManager.SetGhostPosition(mouseWorldPos);
-                }
-            }
-            else
-            {
-                ghostPrefabManager.ShowGhostPrefab(false);
-            }
         }
 
         private void HandleScrollInput(Event e)
@@ -246,23 +291,23 @@ namespace MyUtilities.PrefabPainter
 
             if ((e.control || e.command) && e.shift)
             {
-                ghostPrefabManager.AdjustPrefabZRotation(scrollValue, rotationDelta);
+                ghostManager.AdjustPrefabZRotation(scrollValue, rotationDelta);
                 e.Use();
             }
             else if (e.control || e.command)
             {
-                ghostPrefabManager.AdjustPrefabScale(scrollValue);
+                ghostManager.AdjustPrefabScale(scrollValue);
                 e.Use();
 
             }
             else if (e.alt)
             {
-                ghostPrefabManager.AdjustPrefabZPosition(scrollValue, prefabZDelta);
+                ghostManager.AdjustPrefabZPosition(scrollValue, prefabZDelta);
                 e.Use();
             }
         }
 
-        void LoadSettings()
+        private void LoadSettings()
         {
             // Get the MonoScript object for this EditorWindow
             MonoScript monoScript = MonoScript.FromScriptableObject(this);
@@ -270,18 +315,8 @@ namespace MyUtilities.PrefabPainter
             string scriptPath = AssetDatabase.GetAssetPath(monoScript);
             // Extract the directory from the path
             string currentDirectory = System.IO.Path.GetDirectoryName(scriptPath);
-            string settingsPath = currentDirectory + "\\PrefabPainterSettings.asset";
 
-            settings = AssetDatabase.LoadAssetAtPath<PrefabPainterSettings>(settingsPath);
-
-            if (settings == null)
-            {
-                settings = CreateInstance<PrefabPainterSettings>();
-
-                // Create the asset in the specified path
-                AssetDatabase.CreateAsset(settings, settingsPath);
-                AssetDatabase.SaveAssets(); // Save changes to the asset database
-            }
+            this.settings = Settings.LoadSettingsFromDirectory(currentDirectory);
         }
 
         private void DrawPrefabSelector()
@@ -305,19 +340,19 @@ namespace MyUtilities.PrefabPainter
             }
 
             // Further ensure that settings and its palettes are initialized
-            if (settings != null && settings.palettes != null)
+            if (settings != null && settings.Palettes != null)
             {
-                for (int i = 0; i < settings.palettes.Length; i++)
+                for (int i = 0; i < settings.Palettes.Length; i++)
                 {
                     EditorGUILayout.BeginHorizontal();
-                    settings.palettes[i] = (PrefabPalette)EditorGUILayout.ObjectField(settings.palettes[i], typeof(PrefabPalette), false);
+                    settings.Palettes[i] = (PrefabPalette)EditorGUILayout.ObjectField(settings.Palettes[i], typeof(PrefabPalette), false);
 
 
                     if (GUILayout.Button("-", GUILayout.Width(20)))
                     {
-                        List<PrefabPalette> tempList = new List<PrefabPalette>(settings.palettes);
+                        List<PrefabPalette> tempList = new List<PrefabPalette>(settings.Palettes);
                         tempList.RemoveAt(i);
-                        settings.palettes = tempList.ToArray();
+                        settings.Palettes = tempList.ToArray();
                         GUIUtility.ExitGUI(); // Prevents the rest of the GUI code from running after modifying the list
                     }
 
@@ -329,11 +364,11 @@ namespace MyUtilities.PrefabPainter
 
             if (GUILayout.Button("Add Palette"))
             {
-                if (settings.palettes == null) settings.palettes = new PrefabPalette[0]; // Ensure the palettes array is initialized
+                if (settings.Palettes == null) settings.Palettes = new PrefabPalette[0]; // Ensure the palettes array is initialized
 
-                List<PrefabPalette> tempList = new List<PrefabPalette>(settings.palettes);
+                List<PrefabPalette> tempList = new List<PrefabPalette>(settings.Palettes);
                 tempList.Add(null); // Adds a null entry, to be set in the Inspector
-                settings.palettes = tempList.ToArray();
+                settings.Palettes = tempList.ToArray();
                 EditorUtility.SetDirty(settings); // Mark as dirty to save changes
             }
         }
@@ -342,17 +377,19 @@ namespace MyUtilities.PrefabPainter
         void DrawPalletteSelector()
         {
             // Palette List Dropdown
-            if (settings.palettes != null && settings.palettes.Length > 0)
+            if (settings.Palettes != null && settings.Palettes.Length > 0)
             {
                 List<string> paletteNames = new List<string>();
                 int currentPaletteIndex = -1;
-                for (int i = 0; i < settings.palettes.Length; i++)
+                for (int i = 0; i < settings.Palettes.Length; i++)
                 {
-                    string paletteName = settings.palettes[i] != null ? settings.palettes[i].name : "Unnamed Palette";
+                    string paletteName = settings.Palettes[i] != null ? settings.Palettes[i].name : "Unnamed Palette";
                     paletteNames.Add(paletteName);
-                    if (settings.palettes[i] == activePalette)
+                    if (settings.Palettes[i] == activePalette)
                     {
                         currentPaletteIndex = i;
+                        settings.selectedPalette = i;
+                        EditorUtility.SetDirty(settings);
                     }
                 }
 
@@ -360,14 +397,14 @@ namespace MyUtilities.PrefabPainter
                 if (newPaletteIndex != currentPaletteIndex)
                 {
                     // Update active palette and reset selected prefab
-                    activePalette = settings.palettes[newPaletteIndex];
+                    activePalette = settings.Palettes[newPaletteIndex];
                     selectedPrefabIndex = 0; // Automatically select the first prefab
-                    ghostPrefabManager.CreateGhostPrefab(SelectedPrefab, hidePrefabInHierarchy); // Refresh ghost prefab for the new selection
+                    ghostManager.CreateGhostPrefab(SelectedPrefab, hidePrefabInHierarchy); // Refresh ghost prefab for the new selection
                 }
             }
             else
             {
-                EditorGUILayout.HelpBox("No palettes available. Please add palettes to the list.", MessageType.Info);
+                EditorGUILayout.HelpBox("No Palettes available. Please add Palettes to the list.", MessageType.Info);
             }
 
             if (activePalette == null)

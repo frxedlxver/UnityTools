@@ -1,13 +1,20 @@
 using JetBrains.Annotations;
 using MyUtilities.ClassExtensions;
 using System;
+using UnityEditor;
+using UnityEditor.SearchService;
+using UnityEditor.UIElements;
 using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.UIElements;
 
-namespace MyUtilities.PrefabPainter
+namespace MyUtilities.PrefabBrush
 {
     public class GhostPrefabManager
     {
         internal GameObject ghostPrefab;
+        internal bool active { get {  return ghostPrefab ? ghostPrefab.activeSelf : false; } }
+        internal Vector2 ghost2DPosition = Vector2.zero;
         internal float prefabScale = 1f; // Default scale
         internal float prefabZPos = 0f;
         internal float prefabZRotation = 0f;
@@ -39,25 +46,43 @@ namespace MyUtilities.PrefabPainter
 
         public GameObject CreateGhostPrefab(GameObject prefab, bool hideInHierarchy)
         {
-            Vector3 curPos = Vector2.zero;
-            if (ghostPrefab != null)
-            {
-                curPos = PrefabPosition;
-                GameObject.DestroyImmediate(ghostPrefab);
-            }
-
             if (prefab != null)
             {
                 ghostPrefab = GameObject.Instantiate(prefab);
                 ghostPrefab.name = "PrefabPainterPreview";
                 if (parent != null) ghostPrefab.transform.SetParent(parent.transform, false);
                 ghostPrefab.transform.localScale = Vector3.one * prefabScale;
-                ghostPrefab.transform.position = curPos;
+                SetGhostPosition(ghost2DPosition);
                 SetGhostPrefabMaterial(Color.white);
                 ghostPrefab.hideFlags = hideInHierarchy ? HideFlags.HideAndDontSave : HideFlags.DontSave;
             }
 
+            SetVisibility(true);
+
             return ghostPrefab;
+        }
+
+        internal void HandleMouseMovement(SceneView sceneView, Event e)
+        {
+            // Determine if the mouse is within the Scene view
+            bool isMouseInSceneView = sceneView.cameraViewport.Contains(e.mousePosition);
+
+            if (isMouseInSceneView)
+            {
+                if (!active) SetVisibility(true);
+                if (e.type == EventType.MouseMove || e.type == EventType.MouseDrag)
+                {
+
+                    Vector3 mouseWindowPos = new(e.mousePosition.x, sceneView.camera.pixelHeight - e.mousePosition.y);
+                    ghost2DPosition = sceneView.camera.ScreenToWorldPoint(mouseWindowPos);
+
+                    SetGhostPosition(ghost2DPosition);
+                }
+            }
+            else if (active)
+            {
+                SetVisibility(false);
+            }
         }
 
         public void DestroyGhost()
@@ -75,15 +100,15 @@ namespace MyUtilities.PrefabPainter
             }
         }
 
-        public void ShowGhostPrefab(bool show)
+        public void SetVisibility(bool show)
         {
             if (ghostPrefab == null) return;
 
-            var renderers = ghostPrefab.GetComponentsInChildren<SpriteRenderer>();
-            foreach (var renderer in renderers)
-            {
-                renderer.enabled = show;
-            }
+            ghostPrefab.SetActive(show);
+
+            Debug.Log($"Showing: {show}");
+
+            SceneView.RepaintAll();
         }
 
         public void AdjustPrefabScale(float amount)
