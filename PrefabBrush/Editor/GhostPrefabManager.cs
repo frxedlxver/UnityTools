@@ -44,6 +44,18 @@ namespace MyUtilities.PrefabBrush
             }
         }
 
+        public GhostPrefabManager(Settings settings)
+        {
+            settings.OnPrefabSelected.AddListener(SetPrefab);
+            settings.OnParentSelected.AddListener(SetParent);
+        }
+
+        public void SetPrefab(GameObject prefab)
+        {
+            DestroyGhost();
+            CreateGhostPrefab(prefab, true);
+        }
+
         public GameObject CreateGhostPrefab(GameObject prefab, bool hideInHierarchy)
         {
             if (prefab != null)
@@ -53,8 +65,8 @@ namespace MyUtilities.PrefabBrush
                 if (parent != null) ghostPrefab.transform.SetParent(parent.transform, false);
                 ghostPrefab.transform.localScale = Vector3.one * prefabScale;
                 SetGhostPosition(ghost2DPosition);
-                SetGhostPrefabMaterial(Color.white);
-                ghostPrefab.hideFlags = hideInHierarchy ? HideFlags.HideAndDontSave : HideFlags.DontSave;
+                SetGhostPrefabMaterial(new (255, 255, 255, 0.7f));
+                ghostPrefab.hideFlags = HideFlags.HideAndDontSave;
             }
 
             SetVisibility(true);
@@ -106,8 +118,6 @@ namespace MyUtilities.PrefabBrush
 
             ghostPrefab.SetActive(show);
 
-            Debug.Log($"Showing: {show}");
-
             SceneView.RepaintAll();
         }
 
@@ -153,14 +163,14 @@ namespace MyUtilities.PrefabBrush
             }
         }
 
-        internal void SetParent(GameObject targetParent)
+        internal void SetParent(Transform targetParent)
         {
             if (ghostPrefab != null)
             {
                 if (targetParent != null)
                 {
-                    ghostPrefab.transform.SetParent(targetParent.transform, true);
-                    parent = targetParent.transform;
+                    ghostPrefab.transform.SetParent(targetParent, true);
+                    parent = targetParent;
                 }
                 else ghostPrefab.transform.parent = null;
             }

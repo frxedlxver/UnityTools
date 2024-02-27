@@ -7,19 +7,23 @@ using UnityEngine;
 
 namespace MyUtilities.Toolbars
 {
-    [Overlay(typeof(SceneView), "Panel Overlay Example", true)]
+    [Overlay(typeof(SceneView), "", true)]
     public class SceneToolbar : ToolbarOverlay
     {
         private Button prefabBrushButton;
+
+        private bool prefabBrushActive;
         private VisualElement root;
-        private Settings settings;
-        private KeyCode ShortcutKey = KeyCode.B;
-        private EventModifiers modifiers = EventModifiers.None;
+        private static readonly KeyCode SHORTCUT_KEY = KeyCode.B;
+        private static readonly EventModifiers MODIFIERS = EventModifiers.None;
+
+        private static readonly string PB_BUTTON_TEXT = $"PrefabBrush ({SHORTCUT_KEY})";
         public override VisualElement CreatePanelContent()
         {
             root = new VisualElement() { name = "ToolbarRoot" };    
 
-            AddButton("Prefab Brush", PrefabBrushButtonClicked, out prefabBrushButton);
+            AddButton("", PrefabBrushButtonClicked, out prefabBrushButton);
+            UpdatePrefabBrushButtonText();
 
             SceneView s = SceneView.currentDrawingSceneView;
 
@@ -35,7 +39,7 @@ namespace MyUtilities.Toolbars
 
             if (e.type == EventType.KeyDown)
             {
-                if (e.keyCode == ShortcutKey & e.modifiers == modifiers)
+                if (e.keyCode == SHORTCUT_KEY & e.modifiers == MODIFIERS)
                 {
                     PrefabBrushButtonClicked();
                 }
@@ -57,7 +61,26 @@ namespace MyUtilities.Toolbars
         private void PrefabBrushButtonClicked()
         {
             PrefabBrushWindow.ToggleActive();
+
+            UpdatePrefabBrushButtonText();
         }
+
+        private void UpdatePrefabBrushButtonText()
+        {
+            if (!PrefabBrushWindow.WindowOpen)
+            {
+                prefabBrushButton.text = $"Open {PB_BUTTON_TEXT}";
+            }
+            else if (PrefabBrushWindow.WindowActive)
+            {
+                prefabBrushButton.text = $"Enable {PB_BUTTON_TEXT}";
+            }
+            else
+            {
+                prefabBrushButton.text = $"Disable {PB_BUTTON_TEXT}";
+            }
+        }
+
     }
 
 }

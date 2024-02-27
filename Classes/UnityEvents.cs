@@ -8,4 +8,8 @@ namespace MyUtilities.CustomEvents
     public class FloatEvent : UnityEvent<float> { }
     public class IntEvent : UnityEvent<int> { }
     public class ModeEvent : UnityEvent<ModeManager.Mode> { }
+
+    public class GameObjectEvent : UnityEvent<GameObject> { }
+
+    public class TransformEvent : UnityEvent<Transform> { }
 }

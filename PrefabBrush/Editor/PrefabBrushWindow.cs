@@ -7,17 +7,20 @@ using UnityEditor.Graphs;
 using UnityEditor.Rendering;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.SceneManagement;
+using UnityEngine.UIElements;
 
 namespace MyUtilities.PrefabBrush
 {
     public class PrefabBrushWindow : EditorWindow
     {
-        private static bool windowOpen;
-        private static bool windowActive;
+        public static bool WindowOpen;
+        public static bool WindowActive;
         private PrefabPalette activePalette;
         private Settings settings;
-        private GhostPrefabManager ghostManager = new();
+        private GhostPrefabManager ghostManager;
         private int selectedPrefabIndex;
+        private bool recentParentsFoldoutOpen;
         private float prefabZDelta = 1f;
         private float rotationDelta = 1f;
         private bool hidePrefabInHierarchy = true;
@@ -30,7 +33,7 @@ namespace MyUtilities.PrefabBrush
         {
             get
             {
-                if (activePalette == null || activePalette.prefabs == null || activePalette.prefabs.Length == 0 || selectedPrefabIndex == -1)
+                if (activePalette == null || activePalette.prefabs == null || activePalette.prefabs.Length == 0 || SelectedPrefabIndex == -1)
                     return null;
                 else return activePalette.prefabs.ElementAt(selectedPrefabIndex);
             }
@@ -38,22 +41,15 @@ namespace MyUtilities.PrefabBrush
 
         public int SelectedPrefabIndex
         {
-            get { return selectedPrefabIndex; }
+            get { return settings.CurrentPrefabIndex; }
             set
             {
                 if (activePalette == null || activePalette.prefabs == null) return;
                 value = (value + activePalette.prefabs.Length) % activePalette.prefabs.Length;
-                if (value != selectedPrefabIndex)
-                {
-                    selectedPrefabIndex = value;
-                    ghostManager.CreateGhostPrefab(SelectedPrefab, hidePrefabInHierarchy); // Refresh ghost prefab for the new selection
-                }
+
+                if (value != settings.CurrentPrefabIndex)
+                    settings.CurrentPrefabIndex = value;
             }
-        }
-
-        public PrefabBrushWindow()
-        {
-
         }
 
         private static PrefabBrushWindow GetWindow()
@@ -76,25 +72,27 @@ namespace MyUtilities.PrefabBrush
 
         public static void ToggleActive()
         {
-            SetActive(!windowActive);
+            SetActive(!WindowActive);
         }
 
         public static void SetActive(bool active)
         {
-            if (!windowOpen)
+            if (!WindowOpen)
             {
                 ShowWindow();
             }
 
-            windowActive = active;
+            WindowActive = active;
 
-            if (windowActive)
+            if (WindowActive)
             {
                 GetWindow().OnBecameActive();
             } else
             {
                 GetWindow().OnBecameInactive();
             }
+
+            SceneView.lastActiveSceneView.Focus();
         }
 
         private void OnBecameInvisible()
@@ -110,71 +108,59 @@ namespace MyUtilities.PrefabBrush
         private void OnBecameActive()
         {
             if (settings == null) LoadSettings();
+            if (ghostManager == null) ghostManager = new(settings);
             // remove, in case it has already been added
             SceneView.duringSceneGui -= OnSceneGUI;
             SceneView.duringSceneGui += OnSceneGUI;
-            if (SelectedPrefab != null && ghostManager != null)
+            if (SelectedPrefab != null)
             {
                 ghostManager.CreateGhostPrefab(SelectedPrefab, hidePrefabInHierarchy);
                 ghostManager.prefabScale = 1f;
                 ghostManager.prefabZPos = 0f;
                 ghostManager.prefabZRotation = 0f;
             }
-
-            SceneView.RepaintAll();
-            SceneView.currentDrawingSceneView?.Focus();
         }
 
         private void OnBecameInactive()
         {
             SceneView.duringSceneGui -= OnSceneGUI;
             ghostManager.DestroyGhost();
-            SceneView.currentDrawingSceneView?.Repaint();
-            SceneView.currentDrawingSceneView?.Focus();
         }
         void OnEnable()
         {
 
-            windowOpen = true;
-            windowActive = true;
+            WindowOpen = true;
+            WindowActive = true;
             OnBecameActive();
-            if (settings.Palettes != null && settings.Palettes.Length > 0)
+            if (settings.Palettes != null && settings.Palettes.Count > 0)
             {
-                activePalette = settings.Palettes[settings.selectedPalette];
+                activePalette = settings.Palettes[settings.CurrentPaletteIndex];
             }
         }
 
         void OnDisable()
         {
-            windowOpen = false;
-            windowActive = false;
+            WindowOpen = false;
+            WindowActive = false;
             OnBecameInactive();
         }
 
         void OnGUI()
         {
+
             GUILayout.Label("Prefab Palettes", EditorStyles.boldLabel);
 
             DrawPaletteList();
 
             EditorGUILayout.Space(20);
 
-            GUILayout.Label("Active Palette", EditorStyles.boldLabel);
-
             DrawPalletteSelector();
 
             EditorGUILayout.Space(20);
 
-            GUILayout.Label("Parent", EditorStyles.boldLabel);
-            TargetParent = (GameObject)EditorGUILayout.ObjectField(TargetParent, typeof(GameObject), true);
-
-            if (GUILayout.Button("RemoveParent"))
-            {
-                TargetParent = null;
-            }
-            ghostManager.SetParent(TargetParent);
-
-
+            GUILayout.Label("Target Parent", EditorStyles.boldLabel);
+            DrawParentSelector();
+            
             if (activePalette != null)
             {
                 EditorGUILayout.Space(20);
@@ -213,6 +199,37 @@ namespace MyUtilities.PrefabBrush
             }
 
             this.Repaint();
+        }
+
+        private void DrawParentSelector()
+        {
+            GUILayout.BeginHorizontal();
+            settings.CurrentParent = (Transform)EditorGUILayout.ObjectField(settings.CurrentParent, typeof(Transform), true);
+            if (GUILayout.Button("Remove"))
+            {
+                settings.CurrentParent = null;
+            }
+            GUILayout.EndHorizontal();
+
+            EditorGUILayout.Space(20);
+
+
+            if (settings.recentParents != null && settings.recentParents.Count > 0)
+            {
+                // Assuming settings.recentParents is a List<Transform>
+                // Generate an array of names for the popup
+                string[] options = settings.GetRecentParentNames().ToArray();
+
+                // Display the popup and get the new selected index
+                int newIndex = EditorGUILayout.Popup("Select from recent parents", 0, options);
+
+                // Update the current parent based on selection
+                if (newIndex >= 0 && newIndex < settings.recentParents.Count)
+                {
+                    settings.CurrentParent = settings.recentParents[newIndex];
+                }
+            }
+
         }
 
         private void HandleKeyInput(Event e)
@@ -342,7 +359,7 @@ namespace MyUtilities.PrefabBrush
             // Further ensure that settings and its palettes are initialized
             if (settings != null && settings.Palettes != null)
             {
-                for (int i = 0; i < settings.Palettes.Length; i++)
+                for (int i = 0; i < settings.Palettes.Count; i++)
                 {
                     EditorGUILayout.BeginHorizontal();
                     settings.Palettes[i] = (PrefabPalette)EditorGUILayout.ObjectField(settings.Palettes[i], typeof(PrefabPalette), false);
@@ -352,11 +369,9 @@ namespace MyUtilities.PrefabBrush
                     {
                         List<PrefabPalette> tempList = new List<PrefabPalette>(settings.Palettes);
                         tempList.RemoveAt(i);
-                        settings.Palettes = tempList.ToArray();
+                        settings.Palettes = tempList;
                         GUIUtility.ExitGUI(); // Prevents the rest of the GUI code from running after modifying the list
                     }
-
-                    EditorUtility.SetDirty(settings); // Mark the PaletteData asset as dirty to ensure it saves
 
                     EditorGUILayout.EndHorizontal();
                 }
@@ -364,11 +379,7 @@ namespace MyUtilities.PrefabBrush
 
             if (GUILayout.Button("Add Palette"))
             {
-                if (settings.Palettes == null) settings.Palettes = new PrefabPalette[0]; // Ensure the palettes array is initialized
-
-                List<PrefabPalette> tempList = new List<PrefabPalette>(settings.Palettes);
-                tempList.Add(null); // Adds a null entry, to be set in the Inspector
-                settings.Palettes = tempList.ToArray();
+                settings.AddPalette(null);
                 EditorUtility.SetDirty(settings); // Mark as dirty to save changes
             }
         }
@@ -377,25 +388,15 @@ namespace MyUtilities.PrefabBrush
         void DrawPalletteSelector()
         {
             // Palette List Dropdown
-            if (settings.Palettes != null && settings.Palettes.Length > 0)
+            if (settings.Palettes != null)
             {
-                List<string> paletteNames = new List<string>();
-                int currentPaletteIndex = -1;
-                for (int i = 0; i < settings.Palettes.Length; i++)
-                {
-                    string paletteName = settings.Palettes[i] != null ? settings.Palettes[i].name : "Unnamed Palette";
-                    paletteNames.Add(paletteName);
-                    if (settings.Palettes[i] == activePalette)
-                    {
-                        currentPaletteIndex = i;
-                        settings.selectedPalette = i;
-                        EditorUtility.SetDirty(settings);
-                    }
-                }
+                List<string> paletteNames = settings.GetPaletteNames();
 
-                int newPaletteIndex = EditorGUILayout.Popup(currentPaletteIndex, paletteNames.ToArray());
-                if (newPaletteIndex != currentPaletteIndex)
+                // temp var to check if palette index has changed
+                int newPaletteIndex = EditorGUILayout.Popup("Select Palette", settings.CurrentPaletteIndex, paletteNames.ToArray());
+                if (newPaletteIndex != settings.CurrentPaletteIndex)
                 {
+                    settings.CurrentPaletteIndex = newPaletteIndex;
                     // Update active palette and reset selected prefab
                     activePalette = settings.Palettes[newPaletteIndex];
                     selectedPrefabIndex = 0; // Automatically select the first prefab
