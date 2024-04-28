@@ -2,7 +2,7 @@ using Duopus.Controller;
 using UnityEngine;
 
 
-namespace MyUtilities.MidiPhysics
+namespace MyUtilities.Physics.MidiParameters
 {
     [System.Serializable]
     public class PhysicsParameterController : MonoBehaviour
@@ -84,11 +84,11 @@ namespace MyUtilities.MidiPhysics
         {
             get
             {
-                return duopus.tentacleMass;
+                return duopus.TentacleMass;
             }
             set
             {
-                duopus.tentacleMass = value;
+                duopus.TentacleMass = value;
             }
         }
 

@@ -8,7 +8,7 @@ namespace MyUtilities.PrefabBrush
 {
     public class Settings : ScriptableObject
     {
-        private static readonly string FILE_NAME = "\\SettingsBase.asset";
+        private static readonly string FILE_NAME = "\\Settings.asset";
         private static readonly int MAX_PARENT_HISTORY = 10;
 
 
@@ -27,7 +27,7 @@ namespace MyUtilities.PrefabBrush
             get { return _currentPrefabIndex; }
             set
             {
-                _currentPaletteIndex = value;
+                _currentPrefabIndex = value;
 
                 if (_currentPaletteIndex < Palettes.Count)
                 {
@@ -35,6 +35,7 @@ namespace MyUtilities.PrefabBrush
 
                     if (_currentPrefabIndex < curPalette.prefabs.Length)
                     {
+                        _currentPrefabIndex = value;
                         OnPrefabSelected?.Invoke(curPalette.prefabs[_currentPrefabIndex]);
                     }
                 }
@@ -85,6 +86,13 @@ namespace MyUtilities.PrefabBrush
 
             }
         }
+
+        public PrefabPalette CurrentPalette { 
+            get {
+                return CurrentPaletteIndex < Palettes.Count ? Palettes[CurrentPaletteIndex] : null;
+            } 
+        }
+
         public static Settings LoadSettingsFromDirectory(string directory)
         {
             string settingsPath = directory + FILE_NAME;

@@ -1,12 +1,6 @@
-using JetBrains.Annotations;
-using MyUtilities.ClassExtensions;
-using System;
 using UnityEditor;
-using UnityEditor.SearchService;
-using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.UIElements;
 
 namespace MyUtilities.PrefabBrush
 {
@@ -16,7 +10,7 @@ namespace MyUtilities.PrefabBrush
         internal bool active { get {  return ghostPrefab ? ghostPrefab.activeSelf : false; } }
         internal Vector2 ghost2DPosition = Vector2.zero;
         internal float prefabScale = 1f; // Default scale
-        internal float prefabZPos = 0f;
+        internal int prefabOrderInLayer = 0;
         internal float prefabZRotation = 0f;
         private Transform parent;
 
@@ -56,13 +50,18 @@ namespace MyUtilities.PrefabBrush
             CreateGhostPrefab(prefab, true);
         }
 
+        void OnDisable()
+        {
+            DestroyGhost();
+        }
+
         public GameObject CreateGhostPrefab(GameObject prefab, bool hideInHierarchy)
         {
             if (prefab != null)
             {
                 ghostPrefab = GameObject.Instantiate(prefab);
                 ghostPrefab.name = "PrefabPainterPreview";
-                if (parent != null) ghostPrefab.transform.SetParent(parent.transform, false);
+                if (parent != null) ghostPrefab.transform.SetParent(parent.transform, true);
                 ghostPrefab.transform.localScale = Vector3.one * prefabScale;
                 SetGhostPosition(ghost2DPosition);
                 SetGhostPrefabMaterial(new (255, 255, 255, 0.7f));
@@ -77,21 +76,20 @@ namespace MyUtilities.PrefabBrush
         internal void HandleMouseMovement(SceneView sceneView, Event e)
         {
             // Determine if the mouse is within the Scene view
+            Vector3 mousePosition = Event.current.mousePosition;
             bool isMouseInSceneView = sceneView.cameraViewport.Contains(e.mousePosition);
+
 
             if (isMouseInSceneView)
             {
+                mousePosition = HandleUtility.GUIPointToWorldRay(mousePosition).GetPoint(0);
+
                 if (!active) SetVisibility(true);
-                if (e.type == EventType.MouseMove || e.type == EventType.MouseDrag)
-                {
 
-                    Vector3 mouseWindowPos = new(e.mousePosition.x, sceneView.camera.pixelHeight - e.mousePosition.y);
-                    ghost2DPosition = sceneView.camera.ScreenToWorldPoint(mouseWindowPos);
 
-                    SetGhostPosition(ghost2DPosition);
-                }
+                SetGhostPosition(mousePosition);
             }
-            else if (active)
+            else
             {
                 SetVisibility(false);
             }
@@ -131,12 +129,12 @@ namespace MyUtilities.PrefabBrush
             }
         }
 
-        public void AdjustPrefabZPosition(float amount, float positionDelta)
+        public void AdjustPrefabOrderInLayer(int Pos)
         {
-            prefabZPos += amount / 3f * -positionDelta;
+            prefabOrderInLayer += Pos;
             if (ghostPrefab != null)
             {
-                ghostPrefab.transform.position = new Vector3(ghostPrefab.transform.position.x, ghostPrefab.transform.position.y, prefabZPos);
+                ghostPrefab.GetComponent<SpriteRenderer>().sortingOrder = prefabOrderInLayer;
             }
         }
 
@@ -150,7 +148,7 @@ namespace MyUtilities.PrefabBrush
 
             if (ghostPrefab != null)
             {
-                ghostPrefab.transform.localEulerAngles = new Vector3(ghostPrefab.transform.eulerAngles.x, ghostPrefab.transform.eulerAngles.y, prefabZRotation);
+                ghostPrefab.transform.localEulerAngles = new Vector3(ghostPrefab.transform.eulerAngles.x, ghostPrefab.transform.eulerAngles.y, 0);
             }
         }
 
@@ -158,7 +156,7 @@ namespace MyUtilities.PrefabBrush
         {
             if (ghostPrefab != null)
             {
-                ghostPrefab.transform.position = new Vector3(mouseWorldPos.x, mouseWorldPos.y, prefabZPos);
+                ghostPrefab.transform.position = new Vector3(mouseWorldPos.x, mouseWorldPos.y, prefabOrderInLayer);
                 ghostPrefab.transform.localEulerAngles = new Vector3(ghostPrefab.transform.eulerAngles.x, ghostPrefab.transform.eulerAngles.y, prefabZRotation);
             }
         }
@@ -176,5 +174,7 @@ namespace MyUtilities.PrefabBrush
             }
 
         }
+
+        
     }
 }

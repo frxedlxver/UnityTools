@@ -1,6 +1,6 @@
 using System;
 
-namespace MyUtilities.MidiPhysics
+namespace MyUtilities.Physics.MidiParameters
 {
     [AttributeUsage(AttributeTargets.Property)]
     public class MidiControlAttribute : Attribute

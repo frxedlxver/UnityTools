@@ -4,6 +4,7 @@ using UnityEngine.UIElements;
 using System;
 using MyUtilities.PrefabBrush;
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace MyUtilities.Toolbars
 {
@@ -11,8 +12,7 @@ namespace MyUtilities.Toolbars
     public class SceneToolbar : ToolbarOverlay
     {
         private Button prefabBrushButton;
-
-        private bool prefabBrushActive;
+        private Button removeHiddenPrefabsButton;
         private VisualElement root;
         private static readonly KeyCode SHORTCUT_KEY = KeyCode.B;
         private static readonly EventModifiers MODIFIERS = EventModifiers.None;
@@ -20,10 +20,12 @@ namespace MyUtilities.Toolbars
         private static readonly string PB_BUTTON_TEXT = $"PrefabBrush ({SHORTCUT_KEY})";
         public override VisualElement CreatePanelContent()
         {
-            root = new VisualElement() { name = "ToolbarRoot" };    
+            root = new VisualElement() { name = "ToolbarRoot" };
 
             AddButton("", PrefabBrushButtonClicked, out prefabBrushButton);
             UpdatePrefabBrushButtonText();
+
+            AddButton("Destroy Hidden Prefabs", RemoveHiddenPrefabs, out removeHiddenPrefabsButton);
 
             SceneView s = SceneView.currentDrawingSceneView;
 
@@ -63,6 +65,32 @@ namespace MyUtilities.Toolbars
             PrefabBrushWindow.ToggleActive();
 
             UpdatePrefabBrushButtonText();
+        }
+
+        private void RemoveHiddenPrefabs()
+        {
+            GameObject[] allObjects = Resources.FindObjectsOfTypeAll<GameObject>();
+            List<GameObject> toDestroy = new List<GameObject>();
+
+
+            foreach (GameObject obj in allObjects)
+            {
+                if (obj.hideFlags != HideFlags.None && obj.name.Contains("PrefabPainterPreview"))
+                {
+                    toDestroy.Add(obj);
+                }
+            }
+
+            while (toDestroy.Count > 0)
+            {
+                GameObject.DestroyImmediate(toDestroy[0]);
+                toDestroy.RemoveAt(0);
+            }
+        }
+
+        private void DestroyImmediate(GameObject obj)
+        {
+            throw new NotImplementedException();
         }
 
         private void UpdatePrefabBrushButtonText()
